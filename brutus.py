@@ -95,12 +95,12 @@ def distribute_password_list(path, password,hash_type='sha256'):
         start_line, end_line = comm.recv(source=0)
         print (f"Rank {rank} received -- lines {start_line} to {end_line}")
 
-    
+        total_tested=0
         with open(path) as f:
             for i, line in enumerate(f):
                 if i >= start_line and i < end_line:
-                    
-                    print(f"Rank {rank} testing password: {line.strip()}")
+                    total_tested+=1
+                    print(f"Rank {rank} testing password: {total_tested}")
                     if comm.Iprobe(source=0, tag=12):
                         found = comm.recv(source=0, tag=12)
                         print (f"Rank {rank} Password found by another process")

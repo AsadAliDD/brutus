@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/marcusthierfelder/mpi"
+	"github.com/emer/empi/v2/mpi"
 )
 
 type Chunk struct {
@@ -99,8 +99,8 @@ func processChunk(password string, path string, chunk Chunk, hashType string) {
 
 			hashed, _ := hashPassword(line, hashType)
 
-			fmt.Println("Line Number ", lineCount, ":", line)
-			fmt.Println("Hashed Password: ", hashed)
+			// fmt.Println("Line Number ", lineCount, ":", line)
+			// fmt.Println("Hashed Password: ", hashed)
 
 			if hashed == password_hash {
 				fmt.Println("Password Found: ", line)
@@ -110,49 +110,86 @@ func processChunk(password string, path string, chunk Chunk, hashType string) {
 	}
 }
 
+func send_string(comm *mpi.Comm, rank int, tag int, str string) {
+	strBytes := []byte(str)
+	strLen := len(strBytes)
+	arr := make([]int, 1)
+	arr[0] = strLen
+	comm.SendInt(rank, tag, arr)
+	comm.SendU8(rank, tag, strBytes)
+}
+
+func recv_string(comm *mpi.Comm, rank int, tag int) string {
+	arr := make([]int, 1)
+	comm.RecvInt(rank, tag, arr)
+	strBytes := make([]byte, arr[0])
+	comm.RecvU8(rank, tag, strBytes)
+	return string(strBytes)
+}
+
 func main() {
 
 	// Initialize MPI
 	mpi.Init()
+	defer mpi.Finalize()
 
-	size := mpi.Comm_size(mpi.COMM_WORLD)
-	rank := mpi.Comm_rank(mpi.COMM_WORLD)
+	rank := mpi.WorldRank()
+	size := mpi.WorldSize()
+	// Send byte slice
+	comm, _ := mpi.NewComm(nil)
 
-	fmt.Println(size, rank)
+	fmt.Println("TEST:", size, rank)
 
-	// password := "music"
 	path := "./PasswordLists/10-million-password-list-top-1000.txt"
 
 	if rank == 0 {
 
 		fmt.Println("Master Process")
+
+		// Sending Passowrd to all processes
+		password := "music"
+		for i := 1; i < size; i++ {
+			send_string(comm, i, 1, password)
+		}
+		// passwordBytes := []byte(password)
+		// passLen := len(passwordBytes)
+		// arr := make([]int, 1)
+		// arr[0] = passLen
+		// for i := 1; i < size; i++ {
+		// 	comm.SendInt(i, 1, arr)
+		// 	comm.SendU8(i, 2, passwordBytes)
+		// }
+		//
+
 		lineCount, err := countLines(path)
 		if err != nil {
 			fmt.Println("Error:", err)
 		} else {
 			fmt.Println("Number of lines:", lineCount)
 		}
-
 		chunks := splitChunks(lineCount, size)
 		fmt.Println(chunks)
 
-		data := make([]int, size)
+		data := make([]int, 2)
 		for i := 1; i < size; i++ {
+
 			data[0] = chunks[i-1].start
 			data[1] = chunks[i-1].end
 			fmt.Println("Sending Chunk: ", data)
-			mpi.Send_int(data, i, 10, mpi.COMM_WORLD)
+			comm.SendInt(i, 10, data)
 		}
 
 	} else {
 		fmt.Println("Slave Rank: ", rank)
 
-		data := make([]int, size)
-		mpi.Recv_int(data, 0, 10, mpi.COMM_WORLD)
+		password := recv_string(comm, 0, 1)
+		println("Received String: ", password)
+		data := make([]int, 2)
+		comm.RecvInt(0, 10, data)
+
+		processChunk(password, path, Chunk{data[0], data[1]}, "md5")
 		fmt.Println("Rank ", rank, "Received Chunk: ", data[0], data[1])
 	}
-
-	mpi.Finalize()
 
 	// if rank == 0 {
 	// 	fmt.Println("Rank: ", rank, " Size: ", size)

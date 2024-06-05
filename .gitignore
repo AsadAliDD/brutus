@@ -2,6 +2,9 @@
 *$py.class
 
 PasswordLists/
+go_test_code/
+password_cracker
+brutus
 
 # C extensions
 *.so

@@ -129,6 +129,8 @@ func recv_string(comm *mpi.Comm, rank int, tag int) string {
 
 func main() {
 
+	/* !TODO: Add the functionality for other workers to stop if password found by one  */
+
 	// Initialize MPI
 	mpi.Init()
 	defer mpi.Finalize()
@@ -151,15 +153,6 @@ func main() {
 		for i := 1; i < size; i++ {
 			send_string(comm, i, 1, password)
 		}
-		// passwordBytes := []byte(password)
-		// passLen := len(passwordBytes)
-		// arr := make([]int, 1)
-		// arr[0] = passLen
-		// for i := 1; i < size; i++ {
-		// 	comm.SendInt(i, 1, arr)
-		// 	comm.SendU8(i, 2, passwordBytes)
-		// }
-		//
 
 		lineCount, err := countLines(path)
 		if err != nil {
@@ -190,18 +183,4 @@ func main() {
 		processChunk(password, path, Chunk{data[0], data[1]}, "md5")
 		fmt.Println("Rank ", rank, "Received Chunk: ", data[0], data[1])
 	}
-
-	// if rank == 0 {
-	// 	fmt.Println("Rank: ", rank, " Size: ", size)
-	// } else {
-	// 	fmt.Println("Rank: ", rank)
-	// }
-
-	// chunks := splitChunks(lineCount, 4)
-	// fmt.Println(chunks)
-
-	// processChunk("music", path, chunks[1], "md5")
-
-	// passHash, _ := hashPassword("asad.101", "md5")
-	// fmt.Println(passHash)
 }

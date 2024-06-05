@@ -26,6 +26,18 @@ export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PA
     mpirun -np 4 ./brutus
 ```
 
+## TODO
+
+- [x] Basic Implementation using Python or Go
+  - [x] Chunking Dictionary File
+  - [x] Distributing Chunks Equally
+    - File is not being read by master process. It only distributes the Line Numbers.
+  - [x] Searching for Password
+- [x] Stopping Search when password is found by a worker
+  - [ ] GO Implementation
+- [ ] Work Stealing
+  - If a slave has finished the work, request more work from Master process
+
 ## Authors and acknowledgment
 
 Show your appreciation to those who have contributed to the project.

@@ -2,6 +2,11 @@
 
 A simple dictionary based password cracker.
 
+[![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+[![made-with-Go](https://img.shields.io/badge/Made%20with-Go-1f425f.svg)](https://go.dev/)
+
+
+
 ## MPI-Installation
 
 ### Mac-OS
@@ -34,7 +39,7 @@ export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PA
     - File is not being read by master process. It only distributes the Line Numbers.
   - [x] Searching for Password
 - [x] Stopping Search when password is found by a worker
-  - [ ] GO Implementation
+  - GO Implementation is pending. Already working in Python
 - [ ] Work Stealing
   - If a slave has finished the work, request more work from Master process
 

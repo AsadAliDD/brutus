@@ -2,6 +2,23 @@
 
 A simple dictionary based password cracker.
 
+## MPI-Installation
+
+### Mac-OS
+
+```{bash}
+brew install openmpi pkg-config
+mpicc --showme:libdirs
+```
+
+Adding the path:
+
+```
+export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
+export LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LIBRARY_PATH"
+export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PATH"
+```
+
 ## Building Go APP
 
 ```

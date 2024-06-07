@@ -3,15 +3,53 @@ import hashlib
 import argparse
 from tqdm import tqdm
 import logging
+from pyfiglet import Figlet
+import colorlog
+from termcolor import colored
+from tabulate import tabulate
+
+
 
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
-logging.basicConfig(level=logging.INFO)
 
 
+def setup_logger(logger_name, rank):
+    """Set up logger with color support."""
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.INFO)
 
+    # Remove existing handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    # Choose color based on rank
+    color = 'green' if rank == 0 else 'cyan'
+
+    # Create a colored formatter
+    formatter = colorlog.ColoredFormatter(
+        f"%(log_color)s%(levelname)s:{logger_name}: %(message)s",
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': color,
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'red,bg_white',
+        },
+        reset=True,
+        style='%'
+    )
+
+    # Create a console handler and set its formatter to the colored formatter
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
+    # Add the console handler to the logger
+    logger.addHandler(handler)
+
+    return logger
 
 
 # Hashing function
@@ -44,8 +82,6 @@ def splitChunks(lineCount: int, chunkSize: int) -> list:
         if i == numChunks-1:
             end = lineCount
         chunks.append({'start': start, 'end': end})
-    
-    print (chunks)  
     return chunks
 
 
@@ -67,30 +103,79 @@ def processChunk(chunk: list, password: str, hash_type: str) -> str:
             return test_password
     return None
 
+def ascii_banner():
+
+    f = Figlet(font='univers')
+    print(colored(f.renderText('BRUTUS'), 'red'))
+    f_small = Figlet(font='digital')
+    print(colored(f_small.renderText('A simple password cracker'), 'red'))
+
+def parameter_table(password, hash_type, dict_file, size,lines,chunkSize):
+    # Create a table for the initial logs
+    table = [
+        ["Password", password],
+        ["Hashtype", hash_type],
+        ["Dictionary File", dict_file],
+        ["Number of Processes", size],
+        ["Total Passwords to Try", lines],
+        ["ChunkSize", chunkSize]
+    ]
+    table_str = tabulate(table, headers=["Parameter", "Value"], tablefmt="pipe")
+
+    # Add table boundaries and change the table color
+    table_str = colored(table_str, 'green')
+
+    # Add top and bottom borders
+    border = colored('*' * (len(table_str.split('\n')[0])-5), 'green')
+    table_str = border + '\n' + table_str + '\n' + border
+
+    print(table_str)
+
 def brute_force(dict_file,password, hash_type):
 
+    logger_name = 'MASTER' if rank == 0 else f'SLAVE:{rank}'
+    logger = setup_logger(logger_name, rank)
+
+
     if rank==0:
+        ascii_banner()
+        logger.info("Starting the brute force attack with Parameters")
+        # logger.info(f"Password: {password}")
+        # logger.info(f"Hashtype: {hash_type}")
+        # logger.info(f"Dictionary File: {dict_file}")
+        # logger.info(f"Number of Processes: {size}")
+
+       
+        # logger.info("\n" + tabulate(table, headers=["Parameter", "Value"], tablefmt="pipe"))
+
+
+
+
 
         chunkSize=5000
+        result=None
     #   Send Password and hash_type to Slave Processes
         for i in range(1, size):
             comm.send(password, dest=i,tag=1)
             comm.send(hash_type, dest=i,tag=2)
 
         lines=countLines(dict_file)
-
-        print (f"{lines},{chunkSize}")
     #     # !Modify this later to divide the chunks evenly
         if(lines>0 and lines<=chunkSize):
-            chunkSize=size-1
-            print (chunkSize)
+            chunkSize=lines//(size-1)
 
+
+            
+        
+        parameter_table(password, hash_type, dict_file, size,lines,chunkSize)
+        # logger.info(f"Total Passwords to Try: {lines}")
+        # logger.info(f"ChunkSize: {chunkSize}")
         current_chunk=0
         # * Sending first chunk to all processes
         chunks_queue=splitChunks(lines,chunkSize)
         for i in range(1, size):
             obj=chunks_queue[current_chunk]
-            print (obj['start'],obj['end'])
+            # logger.info(f"Chunk Starting Line: {obj['start']},Chunk Ending Line: {obj['end']}")
             chunk_data=readChunk(dict_file,obj['start'],obj['end'])
             current_chunk+=1
             comm.send(chunk_data, dest=i,tag=3)
@@ -98,11 +183,11 @@ def brute_force(dict_file,password, hash_type):
         # * Getting Results from Slave Processes and Distributing the next chunk
         status = MPI.Status()
         while current_chunk < len(chunks_queue):
-            print (f"Current Chunk: {current_chunk} out of {len(chunks_queue)}")
+            logger.info(f"Current Chunk: {current_chunk} out of {len(chunks_queue)}")
             result = comm.recv(source=MPI.ANY_SOURCE, tag=10,status=status)
             slave_rank = status.Get_source()
             if result[0]:
-                print(f"MASTER: Password found: {result[1]} by Rank {slave_rank}")
+                logger.info(f"Password found: {result[1]} by Rank {slave_rank}")
                 # Broadcast the termination signal to all slave processes
                 for i in range(1, size):
                     comm.send(None, dest=i, tag=13)
@@ -110,7 +195,7 @@ def brute_force(dict_file,password, hash_type):
             else:
                 # print ("TESTTTTT")
                 obj=chunks_queue[current_chunk]
-                print (f"Sending next chunk to Rank {slave_rank}. {obj['start']}: {obj['end']}")
+                logger.info (f"Sending next chunk to Rank {slave_rank}. {obj['start']}: {obj['end']}")
                 chunk_data=readChunk(dict_file,obj['start'],obj['end'])
                 comm.send(chunk_data, dest=slave_rank,tag=3)
                 current_chunk+=1
@@ -121,19 +206,25 @@ def brute_force(dict_file,password, hash_type):
 
         # * Collect any remaining results. 
         for i in range(1, size):
-            print ("YESSS")
+            # print ("YESSS")
             result = comm.recv(source=MPI.ANY_SOURCE, tag=10)
             if result[0]:  # If the password was found
-                print(f"MASTER: Password found by worker {i}: {result[1]}, terminating all processes.")
+                logger.info(f"Password found by worker {i}: {result[1]}, Terminating all processes.")
                 for i in range(1, size):
                     comm.send(None, dest=i, tag=99)  # Sending termination signal
                 break
             else:
-                print(f"MASTER: Rank {i} did not find the password.")
+                logger.info(f"Rank {i} did not find the password.")
         
 
         for i in range(1, size):
             comm.send(None, dest=i, tag=99)
+        
+        comm.Barrier()
+        if result[0]:
+            logger.info(f"Password Found: {result[1]}")
+        else:
+            logger.critical("Password not found. Exiting.")
     
         
     else:
@@ -146,24 +237,28 @@ def brute_force(dict_file,password, hash_type):
         while True:
             chunk = comm.recv(source=0, tag=MPI.ANY_TAG)
             if chunk is None:
-                print (f"Rank {rank} received termination signal")
+                logger.info("Termination Signal Recieved")
                 break   
-            print ("Rank: ",rank, "Processed Chunks: ",prcoessedChunk,"Password: ",password,"Hash Type: ",hash_type)
-
-            prcoessedChunk+=1
+        
+            
             result=processChunk(chunk,password,hash_type)
+            logger.info(f"Processed Chunks: {prcoessedChunk}")
+            prcoessedChunk+=1
             if result:
-                print (f"Rank {rank} found the password: {result}")
+                logger.info(f"Password Found: {result}")
                 comm.send((True,result), dest=0, tag=10)
                 break
             else:
-                print (f"Rank {rank} did not find the password")
+                logger.info("Password not found. Requesting next chunk")
                 comm.send((False,None), dest=0, tag=10)
 
-        print (f"{rank} out from loop")
+        # print (f"{rank} out from loop")
         comm.send((None,None),dest=0, tag=10)
-        print (f"{rank} sent termination signal")
+        comm.Barrier()
+        # print (f"{rank} sent termination signal")
 
+
+    
 
 
 
@@ -174,15 +269,15 @@ def brute_force(dict_file,password, hash_type):
 
 if __name__=='__main__':
 
-
+    
     parser = argparse.ArgumentParser(description="Brutus - A simple password cracker")
     parser.add_argument('--password', type=str, help="The password to crack")
     parser.add_argument('--algorithm', type=str, choices=['md5', 'sha1', 'sha256'], default='sha256', help="Hash algorithm to use")
+    parser.add_argument('--path', type=str, help="Path to the password list")
     args = parser.parse_args()
 
     # path='./PasswordLists/10-million-password-list-top-1000.txt'
-    path='./PasswordLists/10-million-password-list-top-1000000.txt'
-    brute_force(path,args.password,args.algorithm)
+    brute_force(args.path,args.password,args.algorithm)
 
 
 

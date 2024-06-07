@@ -7,6 +7,8 @@ from pyfiglet import Figlet
 import colorlog
 from termcolor import colored
 from tabulate import tabulate
+import time
+
 
 
 
@@ -108,7 +110,7 @@ def ascii_banner():
     f = Figlet(font='univers')
     print(colored(f.renderText('BRUTUS'), 'red'))
     f_small = Figlet(font='digital')
-    print(colored(f_small.renderText('A simple password cracker'), 'red'))
+    print(colored(f_small.renderText('A simple password cracker using MPI'), 'red'))
 
 def parameter_table(password, hash_type, dict_file, size,lines,chunkSize):
     # Create a table for the initial logs
@@ -127,12 +129,13 @@ def parameter_table(password, hash_type, dict_file, size,lines,chunkSize):
 
     # Add top and bottom borders
     border = colored('*' * (len(table_str.split('\n')[0])-5), 'green')
-    table_str = border + '\n' + table_str + '\n' + border
+    table_str = border + '\n' + table_str + '\n' + border + '\n\n'
 
     print(table_str)
 
 def brute_force(dict_file,password, hash_type):
 
+    start_time = time.time()
     logger_name = 'MASTER' if rank == 0 else f'SLAVE:{rank}'
     logger = setup_logger(logger_name, rank)
 
@@ -222,7 +225,19 @@ def brute_force(dict_file,password, hash_type):
         
         comm.Barrier()
         if result[0]:
-            logger.info(f"Password Found: {result[1]}")
+            end_time = time.time()
+            time_taken = end_time - start_time
+
+            logger.info("Finishing Execution")
+            table = [
+                ["Password", result[1]],
+                ["Time Taken", time_taken]
+            ]
+            table_str = tabulate(table, headers=["Parameter", "Value"], tablefmt="pipe")
+            table_str = colored(table_str, 'green')
+            border = colored('*' * (len(table_str.split('\n')[0])-5), 'green')
+            table_str = '\n\n'+border + '\n' + table_str + '\n' + border + '\n\n'
+            print(table_str)
         else:
             logger.critical("Password not found. Exiting.")
     

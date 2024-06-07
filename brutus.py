@@ -33,9 +33,9 @@ def countLines(path: str) -> int:
     with open(path, 'r') as file:
         return sum(1 for line in enumerate(file))
 
-def splitChunks(lineCount: int, numChunks: int) -> list:
+def splitChunks(lineCount: int, chunkSize: int) -> list:
 
-    chunkSize=lineCount//numChunks
+    numChunks=lineCount//chunkSize
     chunks=[]
 
     for i in range(0, numChunks):
@@ -71,14 +71,16 @@ def brute_force(dict_file,password, hash_type):
 
     if rank==0:
 
-        chunkSize=1000
+        chunkSize=5000
     #   Send Password and hash_type to Slave Processes
         for i in range(1, size):
             comm.send(password, dest=i,tag=1)
             comm.send(hash_type, dest=i,tag=2)
 
         lines=countLines(dict_file)
-        # !Modify this later to divide the chunks evenly
+
+        print (f"{lines},{chunkSize}")
+    #     # !Modify this later to divide the chunks evenly
         if(lines>0 and lines<=chunkSize):
             chunkSize=size-1
             print (chunkSize)
@@ -94,19 +96,24 @@ def brute_force(dict_file,password, hash_type):
             comm.send(chunk_data, dest=i,tag=3)
 
         # * Getting Results from Slave Processes and Distributing the next chunk
-        found=False
         status = MPI.Status()
         while current_chunk < len(chunks_queue):
-            print (f"Current Chunk: {current_chunk}")
-            result = comm.recv(source=MPI.ANY_SOURCE, tag=10,souce=status)
+            print (f"Current Chunk: {current_chunk} out of {len(chunks_queue)}")
+            result = comm.recv(source=MPI.ANY_SOURCE, tag=10,status=status)
             slave_rank = status.Get_source()
             if result[0]:
-                print(f"Password found: {result[1]} by Rank {slave_rank}")
+                print(f"MASTER: Password found: {result[1]} by Rank {slave_rank}")
                 # Broadcast the termination signal to all slave processes
                 for i in range(1, size):
                     comm.send(None, dest=i, tag=13)
+                break
             else:
-                print (f"Sending next chunk to Rank {found}")
+                # print ("TESTTTTT")
+                obj=chunks_queue[current_chunk]
+                print (f"Sending next chunk to Rank {slave_rank}. {obj['start']}: {obj['end']}")
+                chunk_data=readChunk(dict_file,obj['start'],obj['end'])
+                comm.send(chunk_data, dest=slave_rank,tag=3)
+                current_chunk+=1
                 # !TODO: Send the next chunk to the process that just finished
 
        
@@ -114,16 +121,20 @@ def brute_force(dict_file,password, hash_type):
 
         # * Collect any remaining results. 
         for i in range(1, size):
+            print ("YESSS")
             result = comm.recv(source=MPI.ANY_SOURCE, tag=10)
             if result[0]:  # If the password was found
-                print(f"Password found by worker {i}: {result[1]}, terminating all processes.")
+                print(f"MASTER: Password found by worker {i}: {result[1]}, terminating all processes.")
                 for i in range(1, size):
                     comm.send(None, dest=i, tag=99)  # Sending termination signal
                 break
             else:
-                print(f"Rank {i} did not find the password.")
-
+                print(f"MASTER: Rank {i} did not find the password.")
         
+
+        for i in range(1, size):
+            comm.send(None, dest=i, tag=99)
+    
         
     else:
         # * Slave Process
@@ -131,27 +142,27 @@ def brute_force(dict_file,password, hash_type):
         password=comm.recv(source=0,tag=1)
         hash_type=comm.recv(source=0,tag=2)
 
-        
+        prcoessedChunk=1
         while True:
-            chunk = comm.recv(source=0, tag=MPI.ANY_TAG, status=MPI.Status())
+            chunk = comm.recv(source=0, tag=MPI.ANY_TAG)
             if chunk is None:
                 print (f"Rank {rank} received termination signal")
                 break   
-            print ("Rank: ",rank, "Chunk: ",len(chunk),"Password: ",password,"Hash Type: ",hash_type)
+            print ("Rank: ",rank, "Processed Chunks: ",prcoessedChunk,"Password: ",password,"Hash Type: ",hash_type)
 
-
+            prcoessedChunk+=1
             result=processChunk(chunk,password,hash_type)
             if result:
                 print (f"Rank {rank} found the password: {result}")
                 comm.send((True,result), dest=0, tag=10)
                 break
             else:
-                comm.send((False,None), dest=0, tag=12)
-                 # !TODO: Request the next Chunk
-                break
+                print (f"Rank {rank} did not find the password")
+                comm.send((False,None), dest=0, tag=10)
 
-
+        print (f"{rank} out from loop")
         comm.send((None,None),dest=0, tag=10)
+        print (f"{rank} sent termination signal")
 
 
 

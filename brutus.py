@@ -99,9 +99,9 @@ def readChunk(path: str, start: int, end: int) -> list:
 
 
 def processChunk(chunk: list, password: str, hash_type: str) -> str:
-    hashed_password = hash_password(password, hash_type)
+    # hashed_password = hash_password(password, hash_type)
     for test_password in chunk:
-        if hash_password(test_password, hash_type) == hashed_password:
+        if hash_password(test_password, hash_type) == password:
             return test_password
     return None
 
@@ -115,7 +115,7 @@ def ascii_banner():
 def parameter_table(password, hash_type, dict_file, size,lines,chunkSize):
     # Create a table for the initial logs
     table = [
-        ["Password", password],
+        ["Password Hash", password],
         ["Hashtype", hash_type],
         ["Dictionary File", dict_file],
         ["Number of Processes", size],

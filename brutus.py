@@ -166,6 +166,8 @@ def brute_force(dict_file,password, hash_type):
         parameter_table(password, hash_type, dict_file, size,lines,chunkSize)
         # logger.info(f"Total Passwords to Try: {lines}")
         # logger.info(f"ChunkSize: {chunkSize}")
+
+        
         current_chunk=0
         # * Sending first chunk to all processes
         chunks_queue=splitChunks(lines,chunkSize)

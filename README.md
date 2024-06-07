@@ -2,7 +2,8 @@
 
 A simple dictionary based password cracker.
 
-![Alt text](./brutus.png)
+![Title](./brutus.png)
+![Demo](./brutus_gif.gif)
 
 
 

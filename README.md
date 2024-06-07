@@ -43,6 +43,9 @@ export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PA
 - [ ] Work Stealing
   - If a slave has finished the work, request more work from Master process
 
+## Notes
+The Go Mpi module doesn't support non-blocking recieving or sending.
+
 ## Authors and acknowledgment
 
 Show your appreciation to those who have contributed to the project.

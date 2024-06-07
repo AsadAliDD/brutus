@@ -2,8 +2,8 @@
 
 A simple dictionary based password cracker.
 
-[![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
-[![made-with-Go](https://img.shields.io/badge/Made%20with-Go-1f425f.svg)](https://go.dev/)
+![Alt text](./brutus.png)
+
 
 
 
@@ -31,6 +31,12 @@ export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PA
     mpirun -np 4 ./brutus
 ```
 
+## Running Python
+
+```(python)
+mpiexec -n 4 python brutus.py --algorithm md5 --path ./PasswordLists/10-million-password-list-top-1000.txt --password 5b9a8069d33fe9812dc8310ebff0a315
+```
+
 ## TODO
 
 - [x] Basic Implementation using Python or Go
@@ -42,6 +48,9 @@ export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PA
   - GO Implementation is pending. Already working in Python
 - [ ] Work Stealing
   - If a slave has finished the work, request more work from Master process
+
+## Notes
+The Go Mpi module doesn't support non-blocking recieving or sending.
 
 ## Authors and acknowledgment
 

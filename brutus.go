@@ -18,6 +18,51 @@ type Chunk struct {
 	end   int
 }
 
+func send_string(comm *mpi.Comm, rank int, tag int, str string) {
+	strBytes := []byte(str)
+	strLen := len(strBytes)
+	arr := make([]int, 1)
+	arr[0] = strLen
+	comm.SendInt(rank, tag, arr)
+	comm.SendU8(rank, tag, strBytes)
+}
+
+func recv_string(comm *mpi.Comm, rank int, tag int) string {
+	arr := make([]int, 1)
+	comm.RecvInt(rank, tag, arr)
+	strBytes := make([]byte, arr[0])
+	comm.RecvU8(rank, tag, strBytes)
+	return string(strBytes)
+}
+
+func send_string_array(comm *mpi.Comm, rank int, tag int, strs []string) {
+	// First, send the length of the array
+	arrLen := len(strs)
+	arr := make([]int, 1)
+	arr[0] = arrLen
+	comm.SendInt(rank, tag, arr)
+
+	// Then, send each string in the array
+	for _, str := range strs {
+		send_string(comm, rank, tag, str)
+	}
+}
+
+func recv_string_array(comm *mpi.Comm, rank int, tag int) []string {
+	// First, receive the length of the array
+	arr := make([]int, 1)
+	comm.RecvInt(rank, tag, arr)
+	arrLen := arr[0]
+
+	// Then, receive each string in the array
+	strs := make([]string, arrLen)
+	for i := 0; i < arrLen; i++ {
+		strs[i] = recv_string(comm, rank, tag)
+	}
+
+	return strs
+}
+
 func hashPassword(password string, hashType string) (string, error) {
 
 	var h hash.Hash
@@ -64,14 +109,14 @@ func countLines(path string) (int, error) {
 func splitChunks(lineCount int, size int) []Chunk {
 
 	// Naive Implementation. All processes except the root process will get the same number of lines.
-	chunkSize := lineCount / (size - 1)
-	chunks := make([]Chunk, size-1)
-	fmt.Println("Chunk Size: ", chunkSize)
+	chunkSize := lineCount / size
+	chunks := make([]Chunk, size)
+	fmt.Println("Chunk Size: ", size)
 
-	for i := 1; i < size; i++ {
+	for i := 1; i <= size; i++ {
 		start := (i - 1) * chunkSize
 		end := i * chunkSize
-		if i == size-1 {
+		if i == size {
 			end = lineCount
 		}
 		chunks[i-1] = Chunk{start, end}
@@ -81,50 +126,43 @@ func splitChunks(lineCount int, size int) []Chunk {
 	return chunks
 }
 
-func processChunk(password string, path string, chunk Chunk, hashType string) {
+func readChunk(path string, chunk Chunk) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
 	defer file.Close()
 
-	password_hash, _ := hashPassword(password, hashType)
 	scanner := bufio.NewScanner(file)
 	lineCount := 0
+	chunkLines := make([]string, 0)
 	for scanner.Scan() {
-		lineCount++
 		if lineCount >= chunk.start && lineCount < chunk.end {
 			line := scanner.Text()
 			line = strings.TrimSpace(line) // remove newline character
+			chunkLines = append(chunkLines, line)
+		}
+		lineCount++
+	}
+	return chunkLines, nil
+}
 
-			hashed, _ := hashPassword(line, hashType)
+func processChunk(password string, path string, chunk []string, hashType string) string {
 
-			// fmt.Println("Line Number ", lineCount, ":", line)
-			// fmt.Println("Hashed Password: ", hashed)
+	password_hash, _ := hashPassword(password, hashType)
+	for _, line := range chunk {
 
-			if hashed == password_hash {
-				fmt.Println("Password Found: ", line)
-				break
-			}
+		hashed, _ := hashPassword(line, hashType)
+
+		// fmt.Println("Line Number ", lineCount, ":", line)
+		// fmt.Println("Hashed Password: ", hashed)
+
+		if hashed == password_hash {
+			fmt.Println("Password Found: ", line)
+			return line
 		}
 	}
-}
-
-func send_string(comm *mpi.Comm, rank int, tag int, str string) {
-	strBytes := []byte(str)
-	strLen := len(strBytes)
-	arr := make([]int, 1)
-	arr[0] = strLen
-	comm.SendInt(rank, tag, arr)
-	comm.SendU8(rank, tag, strBytes)
-}
-
-func recv_string(comm *mpi.Comm, rank int, tag int) string {
-	arr := make([]int, 1)
-	comm.RecvInt(rank, tag, arr)
-	strBytes := make([]byte, arr[0])
-	comm.RecvU8(rank, tag, strBytes)
-	return string(strBytes)
+	return ""
 }
 
 func main() {
@@ -143,10 +181,11 @@ func main() {
 	fmt.Println("TEST:", size, rank)
 
 	path := "./PasswordLists/10-million-password-list-top-1000.txt"
+	// path := "./PasswordLists/weakpass_3w"
 
 	if rank == 0 {
 
-		fmt.Println("Master Process")
+		chunkSize := 1000
 
 		// Sending Passowrd to all processes
 		password := "music"
@@ -154,33 +193,94 @@ func main() {
 			send_string(comm, i, 1, password)
 		}
 
+		// Counting the Lines in the Dictionary file
 		lineCount, err := countLines(path)
 		if err != nil {
 			fmt.Println("Error:", err)
 		} else {
 			fmt.Println("Number of lines:", lineCount)
 		}
-		chunks := splitChunks(lineCount, size)
-		fmt.Println(chunks)
 
-		data := make([]int, 2)
-		for i := 1; i < size; i++ {
-
-			data[0] = chunks[i-1].start
-			data[1] = chunks[i-1].end
-			fmt.Println("Sending Chunk: ", data)
-			comm.SendInt(i, 10, data)
+		if lineCount <= chunkSize {
+			chunkSize = size - 1
 		}
 
+		currentChunk := 0
+		chunks_queue := splitChunks(lineCount, chunkSize)
+
+		// Initially Distribute one chunk to each process
+		for i := 1; i < size; i++ {
+			chunk, err := readChunk(path, chunks_queue[currentChunk])
+			if err != nil {
+				fmt.Println("Error in reading Chunk:", chunks_queue[currentChunk], err)
+			}
+			currentChunk++
+			send_string_array(comm, i, 1, chunk)
+		}
+
+		for currentChunk < len(chunks_queue) {
+
+			found := recv_string()
+		}
+		// Then send the remaining chunks to the processes as they finish
+
+		// for i := 1; i < size; i++ {
+		// 	send_string_array(comm, i, 1, arr[:])
+		// }
+
+		// lineCount, err := countLines(path)
+		// if err != nil {
+		// 	fmt.Println("Error:", err)
+		// } else {
+		// 	fmt.Println("Number of lines:", lineCount)
+		// }
+		// chunks := splitChunks(lineCount, size)
+		// fmt.Println(chunks)
+
+		// data := make([]int, 2)
+		// for i := 1; i < size; i++ {
+
+		// 	data[0] = chunks[i-1].start
+		// 	data[1] = chunks[i-1].end
+		// 	fmt.Println("Sending Chunk: ", data)
+		// 	comm.SendInt(i, 10, data)
+		// }
+
 	} else {
-		fmt.Println("Slave Rank: ", rank)
 
+		// Recieving Password to Crack
 		password := recv_string(comm, 0, 1)
-		println("Received String: ", password)
-		data := make([]int, 2)
-		comm.RecvInt(0, 10, data)
+		println("Received Passowrd: ", password)
+		
 
-		processChunk(password, path, Chunk{data[0], data[1]}, "md5")
-		fmt.Println("Rank ", rank, "Received Chunk: ", data[0], data[1])
+		for {
+
+			// Recieving Chunk
+			chunks := recv_string_array(comm, 0, 1)
+			fmt.Println("Received Chunk, Rank: ", rank, len(chunks))
+			if len(chunks) == 0 {
+				break
+			}
+
+			
+			found := processChunk(password, path, chunks, "md5")
+			if found != "" {
+				fmt.Println("Password Found by Rank: ", rank, "Password: ", found)
+				send_string(comm, 0, 1, found)
+			} else {
+				comm.SendInt(0, 1, []int{0})
+				return
+			}
+		}
+
+		// fmt.Println("Received Array: ", len(strs))
+
+		// fmt.Println("Slave Rank: ", rank, "Received Array: ", len(chunks))
+
+		// data := make([]int, 2)
+		// comm.RecvInt(0, 10, data)
+
+		// processChunk(password, path, Chunk{data[0], data[1]}, "md5")
+		// fmt.Println("Rank ", rank, "Received Chunk: ", data[0], data[1])
 	}
 }

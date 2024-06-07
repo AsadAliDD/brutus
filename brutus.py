@@ -224,9 +224,10 @@ def brute_force(dict_file,password, hash_type):
             comm.send(None, dest=i, tag=99)
         
         comm.Barrier()
+        end_time = time.time()
+        time_taken = end_time - start_time
         if result[0]:
-            end_time = time.time()
-            time_taken = end_time - start_time
+            
 
             logger.info("Finishing Execution")
             table = [
@@ -239,7 +240,18 @@ def brute_force(dict_file,password, hash_type):
             table_str = '\n\n'+border + '\n' + table_str + '\n' + border + '\n\n'
             print(table_str)
         else:
-            logger.critical("Password not found. Exiting.")
+
+
+            logger.info("Finishing Execution")
+            table = [
+                ["Password", "Not Found"],
+                ["Time Taken", time_taken]
+            ]
+            table_str = tabulate(table, headers=["Parameter", "Value"], tablefmt="pipe")
+            table_str = colored(table_str, 'red')
+            border = colored('*' * (len(table_str.split('\n')[0])-5), 'red')
+            table_str = '\n\n'+border + '\n' + table_str + '\n' + border + '\n\n'
+            print(table_str)
     
         
     else:

@@ -143,13 +143,6 @@ def brute_force(dict_file,password, hash_type):
     if rank==0:
         ascii_banner()
         logger.info("Starting the brute force attack with Parameters")
-        # logger.info(f"Password: {password}")
-        # logger.info(f"Hashtype: {hash_type}")
-        # logger.info(f"Dictionary File: {dict_file}")
-        # logger.info(f"Number of Processes: {size}")
-
-       
-        # logger.info("\n" + tabulate(table, headers=["Parameter", "Value"], tablefmt="pipe"))
 
 
 
@@ -298,7 +291,7 @@ if __name__=='__main__':
 
     
     parser = argparse.ArgumentParser(description="Brutus - A simple password cracker")
-    parser.add_argument('--password', type=str, help="The password to crack")
+    parser.add_argument('--password', type=str, help="The password HASH to crack")
     parser.add_argument('--algorithm', type=str, choices=['md5', 'sha1', 'sha256'], default='sha256', help="Hash algorithm to use")
     parser.add_argument('--path', type=str, help="Path to the password list")
     args = parser.parse_args()

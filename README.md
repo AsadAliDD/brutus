@@ -31,6 +31,12 @@ export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PA
     mpirun -np 4 ./brutus
 ```
 
+## Running Python
+
+```(python)
+mpiexec -n 4 python brutus.py --algorithm md5 --path ./PasswordLists/10-million-password-list-top-1000.txt --password 5b9a8069d33fe9812dc8310ebff0a315
+```
+
 ## TODO
 
 - [x] Basic Implementation using Python or Go

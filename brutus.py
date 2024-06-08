@@ -135,6 +135,7 @@ def parameter_table(password, hash_type, dict_file, size,lines,chunkSize):
 
 def brute_force(dict_file,password, hash_type,chunkSize):
 
+    
     start_time = time.time()
     logger_name = 'MASTER' if rank == 0 else f'SLAVE:{rank}'
     logger = setup_logger(logger_name, rank)
@@ -164,6 +165,10 @@ def brute_force(dict_file,password, hash_type,chunkSize):
             
         
         parameter_table(password, hash_type, dict_file, size,lines,chunkSize)
+        # proceed = input("Do you want to proceed? (yes/no): ")
+        # if proceed.lower() != "yes":
+        #     return
+        
         # logger.info(f"Total Passwords to Try: {lines}")
         # logger.info(f"ChunkSize: {chunkSize}")
 

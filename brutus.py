@@ -133,8 +133,9 @@ def parameter_table(password, hash_type, dict_file, size,lines,chunkSize):
 
     print(table_str)
 
-def brute_force(dict_file,password, hash_type):
+def brute_force(dict_file,password, hash_type,chunkSize):
 
+    
     start_time = time.time()
     logger_name = 'MASTER' if rank == 0 else f'SLAVE:{rank}'
     logger = setup_logger(logger_name, rank)
@@ -148,8 +149,8 @@ def brute_force(dict_file,password, hash_type):
 
 
 
-        chunkSize=5000
-        result=None
+        # chunkSize=10000
+        final_result=(None,None)
     #   Send Password and hash_type to Slave Processes
         for i in range(1, size):
             comm.send(password, dest=i,tag=1)
@@ -164,8 +165,14 @@ def brute_force(dict_file,password, hash_type):
             
         
         parameter_table(password, hash_type, dict_file, size,lines,chunkSize)
+        # proceed = input("Do you want to proceed? (yes/no): ")
+        # if proceed.lower() != "yes":
+        #     return
+        
         # logger.info(f"Total Passwords to Try: {lines}")
         # logger.info(f"ChunkSize: {chunkSize}")
+
+
         current_chunk=0
         # * Sending first chunk to all processes
         chunks_queue=splitChunks(lines,chunkSize)
@@ -184,6 +191,7 @@ def brute_force(dict_file,password, hash_type):
             slave_rank = status.Get_source()
             if result[0]:
                 logger.info(f"Password found: {result[1]} by Rank {slave_rank}")
+                final_result = result
                 # Broadcast the termination signal to all slave processes
                 for i in range(1, size):
                     comm.send(None, dest=i, tag=13)
@@ -206,6 +214,7 @@ def brute_force(dict_file,password, hash_type):
             result = comm.recv(source=MPI.ANY_SOURCE, tag=10)
             if result[0]:  # If the password was found
                 logger.info(f"Password found by worker {i}: {result[1]}, Terminating all processes.")
+                final_result = result
                 for i in range(1, size):
                     comm.send(None, dest=i, tag=99)  # Sending termination signal
                 break
@@ -219,12 +228,12 @@ def brute_force(dict_file,password, hash_type):
         comm.Barrier()
         end_time = time.time()
         time_taken = end_time - start_time
-        if result[0]:
+        if final_result[0]:
             
 
             logger.info("Finishing Execution")
             table = [
-                ["Password", result[1]],
+                ["Password", final_result[1]],
                 ["Time Taken", time_taken]
             ]
             table_str = tabulate(table, headers=["Parameter", "Value"], tablefmt="pipe")
@@ -294,10 +303,11 @@ if __name__=='__main__':
     parser.add_argument('--password', type=str, help="The password HASH to crack")
     parser.add_argument('--algorithm', type=str, choices=['md5', 'sha1', 'sha256'], default='sha256', help="Hash algorithm to use")
     parser.add_argument('--path', type=str, help="Path to the password list")
+    parser.add_argument('--chunksize', type=int, help="Size of the chunk to be processed by each process")
     args = parser.parse_args()
 
     # path='./PasswordLists/10-million-password-list-top-1000.txt'
-    brute_force(args.path,args.password,args.algorithm)
+    brute_force(args.path,args.password,args.algorithm,args.chunksize)
 
 
 

@@ -132,11 +132,11 @@ def parameter_table(password, hash_type, dict_file, size, lines, chunkSize):
 
     print(table_str)
 
-def store_result(password,lines,time_taken):
+def store_result(password,size,lines,time_taken):
     # Writing data to CSV
     with open('./logs/results.csv', 'a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([password,lines,time_taken])
+        writer.writerow([password,size,lines,time_taken])
     
 
 def brute_force(dict_file, password, hash_type, chunkSize):
@@ -218,7 +218,7 @@ def brute_force(dict_file, password, hash_type, chunkSize):
         comm.Barrier()
         end_time = time.time()
         time_taken = end_time - start_time
-        store_result(final_result[1],lines,time_taken)
+        store_result(final_result[1],size,lines,time_taken)
 
         if final_result[0]:
             logger.info("Finishing Execution")

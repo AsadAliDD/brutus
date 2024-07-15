@@ -9,6 +9,9 @@ from pyfiglet import Figlet
 from tabulate import tabulate
 from termcolor import colored
 
+import linecache 
+
+
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
@@ -83,12 +86,11 @@ def splitChunks(lineCount: int, chunkSize: int) -> list:
 
 def readChunk(path: str, start: int, end: int) -> list:
     chunk_data = []
-    with open(path, "r") as file:
-        for line_number, line in enumerate(file):
-            if line_number > end:
-                break
-            if start <= line_number < end:
-                chunk_data.append(line.strip())
+
+    for line_number in range(start, end):
+        line = linecache.getline(path, line_number)
+        chunk_data.append(line.strip())
+    
     return chunk_data
 
 
@@ -158,9 +160,10 @@ def brute_force(dict_file, password, hash_type, chunkSize):
         for i in range(1, size):
             obj = chunks_queue[current_chunk]
             # logger.info(f"Chunk Starting Line: {obj['start']},Chunk Ending Line: {obj['end']}")
-            chunk_data = readChunk(dict_file, obj["start"], obj["end"])
+
+            # chunk_data = readChunk(dict_file, obj["start"], obj["end"])
             current_chunk += 1
-            comm.send(chunk_data, dest=i, tag=3)
+            comm.send(obj, dest=i, tag=3)
 
         # * Getting Results from Slave Processes and Distributing the next chunk
         status = MPI.Status()
@@ -181,8 +184,8 @@ def brute_force(dict_file, password, hash_type, chunkSize):
                 logger.info(
                     f"Sending next chunk to Rank {slave_rank}. {obj['start']}: {obj['end']}"
                 )
-                chunk_data = readChunk(dict_file, obj["start"], obj["end"])
-                comm.send(chunk_data, dest=slave_rank, tag=3)
+                # chunk_data = readChunk(dict_file, obj["start"], obj["end"])
+                comm.send(obj, dest=slave_rank, tag=3)
                 current_chunk += 1
                 # !TODO: Send the next chunk to the process that just finished
 
@@ -236,8 +239,9 @@ def brute_force(dict_file, password, hash_type, chunkSize):
             if chunk is None:
                 logger.info("Termination Signal Recieved")
                 break
-
-            result = processChunk(chunk, password, hash_type)
+            
+            chunk_data=readChunk(dict_file, chunk["start"], chunk["end"])
+            result = processChunk(chunk_data, password, hash_type)
             logger.info(f"Processed Chunks: {prcoessedChunk}")
             prcoessedChunk += 1
             if result:

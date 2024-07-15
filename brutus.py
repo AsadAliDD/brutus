@@ -10,7 +10,7 @@ from tabulate import tabulate
 from termcolor import colored
 
 import linecache 
-
+import csv
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -109,6 +109,8 @@ def ascii_banner():
     print(colored(f_small.renderText("A simple password cracker using MPI"), "red"))
 
 
+
+
 def parameter_table(password, hash_type, dict_file, size, lines, chunkSize):
     # Create a table for the initial logs
     table = [
@@ -130,6 +132,12 @@ def parameter_table(password, hash_type, dict_file, size, lines, chunkSize):
 
     print(table_str)
 
+def store_result(password,lines,time_taken):
+    # Writing data to CSV
+    with open('./logs/results.csv', 'a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([password,lines,time_taken])
+    
 
 def brute_force(dict_file, password, hash_type, chunkSize):
     start_time = time.time()
@@ -210,6 +218,8 @@ def brute_force(dict_file, password, hash_type, chunkSize):
         comm.Barrier()
         end_time = time.time()
         time_taken = end_time - start_time
+        store_result(final_result[1],lines,time_taken)
+
         if final_result[0]:
             logger.info("Finishing Execution")
             table = [["Password", final_result[1]], ["Time Taken", time_taken]]

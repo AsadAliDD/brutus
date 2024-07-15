@@ -2,6 +2,7 @@
 *$py.class
 
 PasswordLists/
+logs/
 go_test_code/
 password_cracker
 brutus

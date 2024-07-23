@@ -35,7 +35,7 @@ export LD_LIBRARY_PATH="/opt/homebrew/Cellar/open-mpi/5.0.3_1/lib:$LD_LIBRARY_PA
 ## Running Python
 
 ```(python)
-mpiexec -n 4 python brutus.py --algorithm md5 --path ./PasswordLists/10-million-password-list-top-1000.txt --password 5b9a8069d33fe9812dc8310ebff0a315 --chunksize 20000
+mpiexec -n 4 python src/brutus.py --algorithm md5 --path ./PasswordLists/xato-net-10-million-passwords.txt --password 54379dd2055658dd75c866f21435cff2 --chunksize 50000
 ```
 
 
@@ -52,8 +52,8 @@ mpiexec -n 12 --hostfile pcs.txt python3 brutus.py --algorithm md5 --path ./Pass
   - [x] Searching for Password
 - [x] Stopping Search when password is found by a worker
   - GO Implementation is pending. Already working in Python
-- [ ] Work Stealing
+- [x] Dynamic Work Distribution
   - If a slave has finished the work, request more work from Master process
 
 ## Notes
-The Go Mpi module doesn't support non-blocking recieving or sending.
+The Go Mpi module doesn't support non-blocking recieving or sending hence the implementation was switched to Python.
